@@ -1,0 +1,4 @@
+override-dependencies = [
+  "faiss-cpu==1.7.4"
+]
+
