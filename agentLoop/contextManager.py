@@ -6,7 +6,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 import asyncio
-from action.executor import run_user_code, execute_python_code_variant
+from action.executor import run_user_code, execute_python_code_variant, run_python_code_legacy
 from rich.console import Console
 from rich.prompt import Prompt
 from rich.panel import Panel
@@ -115,8 +115,8 @@ class ExecutionContextManager:
         """Execute code with COMPLETE variable injection"""
         code_to_execute = self._extract_executable_code(output)
         
-        if not code_to_execute:
-            return {"status": "error", "error": "No executable code found"}
+        if not code_to_execute and not output.get("files"):
+            return {"status": "error", "error": "No executable code or files found"}
         
         # Get node data for context
         node_data = self.plan_graph.nodes[step_id]
@@ -125,6 +125,7 @@ class ExecutionContextManager:
         # Get globals_schema for injection
         globals_schema = self.plan_graph.graph['globals_schema']
         
+        updated_code_to_execute = {}
         for code_key, code in code_to_execute.items():
             try:
                 # INJECT ALL AVAILABLE VARIABLES
@@ -149,20 +150,35 @@ class ExecutionContextManager:
                 
                 enhanced_code = globals_injection + code
                 
+                '''
                 result = await run_user_code(
                     enhanced_code,
                     self.multi_mcp if hasattr(self, 'multi_mcp') else None,
                     self.plan_graph.graph['session_id']
                 )
-                
+
                 if result.get("status") == "success":
                     result["executed_variant"] = code_key
                     return result
                 
+                '''
+
+                updated_code_to_execute[code_key] = enhanced_code
+                
             except Exception as e:
                 continue
         
-        return {"status": "error", "error": "All code variants failed"}
+        output['code_variants'] = updated_code_to_execute
+        
+        result = await run_user_code(
+                    output,
+                    self.multi_mcp if hasattr(self, 'multi_mcp') else None,
+                    self.plan_graph.graph['session_id'],
+                    globals_schema
+                )
+
+        return result
+        #return {"status": "error", "error": "All code variants failed"}
     
     def _merge_execution_results(self, original_output, execution_result):
         """Merge execution results into agent output"""
@@ -170,7 +186,9 @@ class ExecutionContextManager:
             return original_output
         
         enhanced_output = original_output.copy()
-        enhanced_output["execution_result"] = execution_result.get("result")
+        result_data = self._format_executed_result(execution_result) #execution_result.get("result", {})
+        
+        enhanced_output["execution_result"] = result_data
         enhanced_output["execution_status"] = execution_result.get("status")
         enhanced_output["execution_error"] = execution_result.get("error") 
         enhanced_output["execution_time"] = execution_result.get("execution_time")
@@ -178,7 +196,6 @@ class ExecutionContextManager:
         
         # Merge execution results directly
         if execution_result.get("status") == "success":
-            result_data = execution_result.get("result", {})
             if isinstance(result_data, dict):
                 for key, value in result_data.items():
                     if key not in enhanced_output:
@@ -186,6 +203,24 @@ class ExecutionContextManager:
         
         return enhanced_output
     
+    def _format_executed_result(self, execution_result, type="agent_input"):
+        """Format executed result"""
+        result_data = execution_result.get("result", {})
+        created_files = []
+        code_output = {}
+
+        if "direct_files" in execution_result.get("operations", []):
+            created_files = execution_result.get("file_results", {}).get("created_files", [])
+            if created_files:
+                result_data.update(**dict(files_created=created_files))
+        
+        if "python_code" in execution_result.get("operations", []):
+            code_output = execution_result.get("code_results", {}).get("result", {})
+            if code_output:
+                result_data.update(**code_output)
+
+        return result_data
+        
     def _is_clarification_request(self, agent_type, output):
         """Check if agent output requires user interaction"""
         return (
@@ -289,7 +324,7 @@ class ExecutionContextManager:
                 
                 # Strategy 1: Extract from code execution results (RetrieverAgent, CoderAgent)
                 if execution_result and execution_result.get("status") == "success":
-                    result_data = execution_result.get("result", {})
+                    result_data = self._format_executed_result(execution_result) #execution_result.get("result", {})
                     
                     if write_key in result_data:
                         globals_schema[write_key] = result_data[write_key]
