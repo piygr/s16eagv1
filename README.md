@@ -1,5 +1,8 @@
- ## Final Agent Architecture
+## S16EAGv1 | Agentic AI Architecture
 
+
+##### Example prompts
+```
 - Find the ASCII values of characters in INDIA and then return sum of exponentials of those values.
 - How much Anmol singh paid for his DLF apartment via Capbridge? 
 - What do you know about Don Tapscott and Anthony Williams?
@@ -11,5 +14,5 @@
 - How much money did Anmol Singh paid to DLF to buy an apartment in Camelias indirectly? Search local storage agian?
 - What are the main differences between Mercedes S Class end E Class. Reply back in markdown list. 
 - Who is the current chairman of DLF? Search local documents. 
-
+```
 
