@@ -2,6 +2,8 @@
 
 A modular Python framework to orchestrate autonomous AI agents using memory, perception, heuristics, action execution, and browser control. The project is built around the concept of `agentLoop`, allowing AI agents to think, plan, and act via a persistent mesh of capabilities.
 
+[DEMO](https://youtu.be/3Y3x0Lr05PQ)
+
 ---
 
 ## 🧠 Key Features
